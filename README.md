@@ -83,9 +83,10 @@ outside business hours (`superset_scale_up_cron` / `superset_scale_down_cron`).
 make generate-data   # uv run data/generator/generate_mock_data.py (Faker, seeded — deterministic)
 ```
 
-## Known limitation
+## Superset dataset connection
 
-Superset's DuckDB→DuckLake auto-attach (`superset/superset_config.py`) has been verified
-locally against a real Postgres catalog (see **Superset de-risking** in
-`docs/architecture.md`), but not yet against the real deployed RDS/S3 — spot-check that
-once after first applying the `superset` module, per the same section.
+Add the DuckLake catalog in the UI once: **Settings → Database Connections → + Database →
+DuckDB**, URI `duckdb:///:memory:`. It comes up already attached to the curated tables
+(`customers`, `products`, `orders`, `order_items`, `mart_order_summary` under the
+`ducklake_catalog` database in SQL Lab's schema browser) — see **Superset de-risking** in
+`docs/architecture.md` for how that auto-attach mechanism works and how it was verified.

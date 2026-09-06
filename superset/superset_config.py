@@ -49,33 +49,41 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 def _attach_ducklake_on_duckdb_connect(dbapi_connection, connection_record):
     # Fires for every SQLAlchemy connection pool in the process (Superset's own metastore
-    # pool included) — only act on DuckDB DBAPI connections.
-    if type(dbapi_connection).__module__.split(".")[0] != "duckdb":
+    # pool included) — only act on DuckDB DBAPI connections. duckdb-engine wraps the raw
+    # duckdb.DuckDBPyConnection in its own duckdb_engine.ConnectionWrapper, so the module
+    # name is "duckdb_engine", not "duckdb" — an exact-match check here (as an earlier
+    # version of this file had) silently rejects every real connection and this whole
+    # hook becomes a no-op. Verified empirically: startswith("duckdb") catches both.
+    if not type(dbapi_connection).__module__.startswith("duckdb"):
         return
     if not DUCKLAKE_DB_HOST:
         return  # not configured (e.g. local dev without the full env) — no-op
 
-    cursor = dbapi_connection.cursor()
-    cursor.execute(f"SET extension_directory='{DUCKDB_EXTENSION_DIR}'")
-    cursor.execute("SET autoinstall_known_extensions=false")
-    cursor.execute("SET autoload_known_extensions=false")
-    cursor.execute("LOAD httpfs")
-    cursor.execute("LOAD aws")
-    cursor.execute("LOAD postgres")
-    cursor.execute("LOAD ducklake")
-    cursor.execute(
+    # Execute directly on dbapi_connection, NOT on a `.cursor()` of it: DuckDB's Python
+    # cursors are independent sub-sessions with their own catalog/schema state (`USE` on
+    # a cursor never propagates to the parent connection), so running ATTACH/USE on a
+    # cursor silently leaves the actual connection Superset queries against unattached,
+    # still defaulted to the built-in `memory` catalog. Verified empirically — this was
+    # the reason SQL Lab's schema browser showed zero tables despite this hook "running".
+    dbapi_connection.execute(f"SET extension_directory='{DUCKDB_EXTENSION_DIR}'")
+    dbapi_connection.execute("SET autoinstall_known_extensions=false")
+    dbapi_connection.execute("SET autoload_known_extensions=false")
+    dbapi_connection.execute("LOAD httpfs")
+    dbapi_connection.execute("LOAD aws")
+    dbapi_connection.execute("LOAD postgres")
+    dbapi_connection.execute("LOAD ducklake")
+    dbapi_connection.execute(
         f"CREATE OR REPLACE SECRET s3_secret (TYPE S3, PROVIDER CREDENTIAL_CHAIN, REGION '{AWS_REGION}')"
     )
     dsn = (
         f"dbname={DUCKLAKE_DB_NAME} host={DUCKLAKE_DB_HOST} port={DUCKLAKE_DB_PORT} "
         f"user={DUCKLAKE_DB_USER} password={DUCKLAKE_DB_PASSWORD}"
     )
-    cursor.execute(
+    dbapi_connection.execute(
         f"ATTACH 'ducklake:postgres:{dsn}' AS ducklake_catalog "
         f"(DATA_PATH 's3://{CURATED_BUCKET}/ducklake/')"
     )
-    cursor.execute("USE ducklake_catalog")
-    cursor.close()
+    dbapi_connection.execute("USE ducklake_catalog")
 
 
 event.listen(Pool, "connect", _attach_ducklake_on_duckdb_connect)

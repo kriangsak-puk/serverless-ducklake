@@ -202,22 +202,41 @@ anywhere.
 
 ## Superset de-risking
 
-Already verified locally (against a real local Postgres container, not mocked):
+Verified end-to-end, including against real deployed AWS resources (RDS in the actual
+VPC, S3 via the credential-chain secret, live ALB) — SQL Lab's schema browser shows
+`ducklake_catalog.main` with all 5 curated tables, and queries against them return real
+data.
+
+Getting there took two real bugs, both instructive enough to call out:
+
+1. **The connect hook used `dbapi_connection.cursor()` to run `ATTACH`/`USE`.** DuckDB's
+   Python cursors are independent sub-sessions — catalog/schema state set on a cursor
+   (`USE ducklake_catalog`) never propagates back to the parent connection. Fixed by
+   executing directly on `dbapi_connection`, matching the pattern already used in
+   `lambdas/shared/duckdb_session.py`.
+2. **The connection-type filter was an exact string match (`== "duckdb"`) on the DBAPI
+   connection's module name.** `duckdb-engine` wraps the raw `duckdb.DuckDBPyConnection`
+   in its own `duckdb_engine.ConnectionWrapper` — module name `duckdb_engine`, not
+   `duckdb`. The exact match silently rejected every real connection Superset ever opened,
+   so the hook was a no-op the whole time; an initial isolated test with plain
+   `duckdb-engine` (no Superset) happened to "pass" only because it wrote and read back
+   from the same reused, un-attached connection — a false positive from insufficient test
+   isolation. Fixed with `.startswith("duckdb")`, which catches both module names, and
+   confirmed via `sqlalchemy.inspect(engine).get_schema_names()` — the exact call
+   Superset's UI makes — actually listing `ducklake_catalog.main`.
+
+If you ever touch `superset/superset_config.py` again, re-verify with `inspect()`
+directly (not just "the app didn't crash") — this class of bug fails silently.
+
+Original local-Postgres verification (still valid, boot sequence unaffected by the fix
+above):
 
 - The image builds cleanly and `superset db upgrade`, `superset fab create-admin`, and
   `superset init` all complete successfully against a real Postgres metastore.
 - The full `entrypoint.sh` boot sequence works — `gunicorn` comes up and `/health` returns
   `200`, matching the ALB's health check config.
-- The core mechanism itself — a SQLAlchemy `Pool` "connect" hook re-running
-  `ATTACH ... TYPE ducklake` + `USE` on every new DuckDB connection — was verified directly
-  with `duckdb-engine`'s `create_engine("duckdb:///:memory:")`: a table created on one
-  connection was visible from a second, freshly-opened connection, proving the catalog
-  persists in Postgres and the hook fires correctly on each new connection, not just the
-  first.
 
-What's *not* yet verified is this same flow against the real deployed AWS resources (RDS
-inside the actual VPC, S3 via the credential-chain secret rather than a local filesystem
-path). Spot-check once after first deploying the `superset` module:
+To reproduce the connection-level check locally against a temporary Postgres:
 
 ```bash
 docker build --platform linux/arm64 -f superset/Dockerfile -t ducklake-superset:local .
