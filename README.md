@@ -1,5 +1,7 @@
 # serverless-ducklake
 
+![DuckLake on AWS](docs/ducklakeonaws.png)
+
 A cost-optimized DuckLake (DuckDB table format) data lakehouse on AWS: Lambda + Step
 Functions for ingest/transform/maintenance, S3 for storage, RDS Postgres for the DuckLake
 catalog, API Gateway for programmatic queries, and Apache Superset on Fargate for BI —
