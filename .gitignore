@@ -38,4 +38,4 @@ venv/
 # Editors
 .vscode/
 .idea/
-.temp/
+temp/
