@@ -26,6 +26,27 @@ scripts/        Deploy/build/init/query helper scripts
 docs/           Architecture writeup
 ```
 
+## Tools & technologies
+
+**Infrastructure**
+- [Terraform](https://www.terraform.io/) >= 1.5 — `hashicorp/aws` ~> 6.0, `hashicorp/random` ~> 3.6, `hashicorp/time` ~> 0.12 (the last one only to work around an IAM eventual-consistency race, see `docs/architecture.md`)
+- AWS: VPC (no NAT Gateway), S3, RDS for PostgreSQL 17, Lambda (container images, arm64/Graviton), ECR, Step Functions (Standard), EventBridge, API Gateway (HTTP API), ECS on Fargate (arm64) + Application Load Balancer, IAM, CloudWatch Logs, Application Auto Scaling, SSM/ECS Exec
+
+**Data & query engine**
+- [DuckDB](https://duckdb.org/) 1.5.5 with the `ducklake`, `postgres`, `httpfs`, and `aws` extensions — baked into the image at build time, not installed at runtime
+- [DuckLake](https://ducklake.select/) — the table format itself (Postgres-backed catalog, Parquet data files in S3)
+
+**BI**
+- [Apache Superset](https://superset.apache.org/) 6.1.0 (`-py312` image variant), connected to DuckDB via [`duckdb-engine`](https://github.com/Mause/duckdb_engine) (SQLAlchemy dialect), served by gunicorn
+
+**Language & packaging**
+- Python 3.12 (Superset) / 3.13 (Lambda) — dependencies installed with [`uv`](https://docs.astral.sh/uv/) everywhere (Dockerfiles and local scripts), not `pip`
+- Docker + Buildx, building explicitly for `linux/arm64` with provenance/SBOM attestation disabled (Lambda rejects the multi-manifest image BuildKit produces by default)
+- [Faker](https://faker.readthedocs.io/) — generates the mock e-commerce seed data
+
+**Local tooling**
+- AWS CLI, `make`, bash scripts (`scripts/`)
+
 ## Deploying (first time)
 
 Follow this order — each step should be sanity-checked before moving to the next (see
