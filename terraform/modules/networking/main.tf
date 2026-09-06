@@ -203,7 +203,7 @@ resource "aws_security_group" "fargate" {
 
 resource "aws_security_group" "rds" {
   name        = "${var.name_prefix}-rds-sg"
-  description = "Catalog RDS Postgres — inbound only from lambda_sg and fargate_sg"
+  description = "Catalog RDS Postgres - inbound only from lambda_sg and fargate_sg"
   vpc_id      = aws_vpc.this.id
 
   ingress {

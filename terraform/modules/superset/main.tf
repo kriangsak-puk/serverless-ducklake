@@ -100,6 +100,14 @@ resource "aws_ecs_service" "superset" {
   desired_count   = 1
   launch_type     = null # capacity provider strategy governs placement
 
+  # Superset's first boot (db upgrade + fab create-admin + init, see entrypoint.sh) can
+  # take ~60-90s before gunicorn is even listening. Without a grace period, ECS starts
+  # counting ALB health-check failures from the moment the task is placed, decides the
+  # task is unhealthy before it's finished booting, and launches a replacement — leaving
+  # two tasks running against desired_count=1. 120s covers the observed boot time with
+  # margin.
+  health_check_grace_period_seconds = 120
+
   # Lets `aws ecs execute-command` open a shell in the running task — used by
   # scripts/db_tunnel.sh as a no-extra-infra way to reach the private RDS instance for ad
   # hoc debugging, instead of standing up a dedicated bastion host.

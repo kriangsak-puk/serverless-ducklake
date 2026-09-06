@@ -25,7 +25,7 @@ REPO_NAME="${NAME_PREFIX}-${FUNCTION}"
 IMAGE_URI="${ECR_REGISTRY}/${REPO_NAME}:${TAG}"
 
 echo "==> building shared base image (ducklake-base:latest, ${PLATFORM})"
-docker build --platform "${PLATFORM}" -f "${REPO_ROOT}/lambdas/base/Dockerfile.base" -t ducklake-base:latest "${REPO_ROOT}"
+docker build --platform "${PLATFORM}" --provenance=false --sbom=false -f "${REPO_ROOT}/lambdas/base/Dockerfile.base" -t ducklake-base:latest "${REPO_ROOT}"
 
 if [ "${FUNCTION}" = "superset" ]; then
   DOCKERFILE="${REPO_ROOT}/superset/Dockerfile"
@@ -34,7 +34,11 @@ else
 fi
 
 echo "==> building ${FUNCTION} image (${PLATFORM})"
-docker build --platform "${PLATFORM}" -f "${DOCKERFILE}" -t "${IMAGE_URI}" "${REPO_ROOT}"
+# --provenance=false --sbom=false: recent BuildKit attaches provenance/SBOM attestations
+# by default, which turns the pushed image into a multi-manifest index — Lambda's
+# CreateFunction rejects that ("image manifest ... is not supported"), so it must be a
+# plain single-platform manifest.
+docker build --platform "${PLATFORM}" --provenance=false --sbom=false -f "${DOCKERFILE}" -t "${IMAGE_URI}" "${REPO_ROOT}"
 
 echo "==> logging in to ECR (${ECR_REGISTRY})"
 aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"

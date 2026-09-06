@@ -2,10 +2,10 @@
 # Terraform does not allow variables here, so these are literal values.
 terraform {
   backend "s3" {
-    bucket         = "REPLACE_WITH_bootstrap_state_bucket_name"
+    bucket         = "ducklake-tf-state-095833340753"
     key            = "ducklake/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "REPLACE_WITH_bootstrap_lock_table_name"
+    dynamodb_table = "ducklake-tf-lock"
     encrypt        = true
   }
 }

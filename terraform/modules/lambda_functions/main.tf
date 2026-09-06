@@ -4,6 +4,20 @@ resource "aws_cloudwatch_log_group" "function" {
   retention_in_days = 14
 }
 
+# IAM is eventually consistent — attaching AWSLambdaVPCAccessExecutionRole can return
+# success before it's actually usable, and creating the Lambda function immediately after
+# fails with "execution role does not have permissions to call CreateNetworkInterface".
+# This is a well-known AWS race, not a config error; wait it out explicitly rather than
+# relying on retry-by-hand.
+resource "time_sleep" "wait_for_iam" {
+  depends_on = [
+    aws_iam_role_policy_attachment.logs,
+    aws_iam_role_policy_attachment.vpc_access,
+    aws_iam_role_policy.s3_access,
+  ]
+  create_duration = "15s"
+}
+
 resource "aws_lambda_function" "this" {
   for_each = var.functions
 
@@ -46,5 +60,5 @@ resource "aws_lambda_function" "this" {
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.function]
+  depends_on = [aws_cloudwatch_log_group.function, time_sleep.wait_for_iam]
 }
