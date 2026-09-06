@@ -4,8 +4,8 @@ A lightweight, low-cost data lakehouse built on **DuckLake** (DuckDB's table for
 AWS S3, RDS, Lambda, Step Functions, ECR, and ECS Fargate. Designed for small-to-medium
 data platforms where a full-time data warehouse cluster is overkill.
 
-This adapts the original design in `temp/architect.md` (and the accompanying Miro board)
-to what's actually implemented in this repo — see **Deviations from the original design**
+This adapts an earlier hand-sketched design (originally worked out on a Miro board) to
+what's actually implemented in this repo — see **Deviations from the original design**
 below for the handful of places implementation reality changed the plan.
 
 ---
@@ -110,7 +110,7 @@ to stop and start freely:
 
 ## Deviations from the original design
 
-`temp/architect.md` got most of this right, but four things changed between sketch and
+The original sketch got most of this right, but six things changed between design and
 implementation:
 
 1. **Step Functions: Standard, not Express.** Express workflows cap execution at 5
