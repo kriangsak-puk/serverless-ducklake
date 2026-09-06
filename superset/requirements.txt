@@ -1,0 +1,7 @@
+# Keep duckdb in sync with lambdas/base/Dockerfile.base. apache/superset:6.1.0-py312 ships
+# Python 3.12, so this can match the Lambda images exactly (older Superset images shipped
+# Python 3.9, which capped duckdb at 1.4.5 — no longer a constraint here).
+# duckdb-engine left unpinned so uv resolves a version compatible with this duckdb.
+duckdb==1.5.5
+duckdb-engine
+psycopg2-binary==2.9.12

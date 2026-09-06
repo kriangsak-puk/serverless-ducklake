@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and adjust. Everything here has a default in variables.tf —
+# only override what you need to change.
+
+region      = "us-east-1"
+name_prefix = "ducklake"
+
+# Set after building/pushing images with scripts/build_and_push_image.sh
+# image_tag = "abc1234"
+
+# Set after building/pushing the Superset image (defaults to this repo's own ECR "superset"
+# repo + image_tag if left blank)
+# superset_image = ""

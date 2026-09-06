@@ -1,0 +1,40 @@
+# Shared base image for all 4 Lambda functions. Bakes the DuckDB extensions needed for
+# DuckLake at BUILD time, not runtime — the Transform/Maintain/Query functions run in a
+# private VPC subnet with no NAT Gateway and no internet egress, so a runtime
+# `INSTALL ducklake` (which tries to reach extensions.duckdb.org) would hang and fail.
+#
+# extension_directory is set explicitly by lambdas/shared/duckdb_session.py to this same
+# path at runtime — do not rely on `home_directory`, which if pointed at /tmp would make
+# DuckDB look for extensions under /tmp/.duckdb/... instead of here, and fail (autoload is
+# disabled, so that failure is a hard error, not a silent re-download).
+#
+# Build for linux/arm64 (see scripts/build_and_push_image.sh) — this must match the
+# `architectures = ["arm64"]` set on the Lambda functions in
+# terraform/modules/lambda_functions/main.tf (Graviton is also ~20% cheaper). Building on
+# an Apple Silicon host without pinning --platform would already produce an arm64 image;
+# building on an x86_64 host would silently produce a mismatched image without it.
+
+FROM public.ecr.aws/lambda/python:3.13
+
+# Python dependency installs use uv, not pip, everywhere in this repo (local scripts
+# included — see data/generator and scripts/query_cli.py).
+COPY --from=ghcr.io/astral-sh/uv:0.12.10 /uv /uvx /usr/local/bin/
+
+ENV DUCKDB_EXTENSION_DIR=/opt/duckdb_extensions
+
+# duckdb must be recent enough to have the ducklake extension published for it (verified
+# working at 1.5.5 as of this writing). Check https://duckdb.org/docs/extensions/ducklake
+# if bumping. --system installs into this image's system Python — there's no venv here.
+RUN uv pip install --system --no-cache duckdb==1.5.5 psycopg2-binary==2.9.12 boto3
+
+RUN mkdir -p ${DUCKDB_EXTENSION_DIR} && \
+    python3 -c "\
+import duckdb; \
+con = duckdb.connect(config={'extension_directory': '${DUCKDB_EXTENSION_DIR}'}); \
+con.execute('INSTALL httpfs'); \
+con.execute('INSTALL aws'); \
+con.execute('INSTALL postgres'); \
+con.execute('INSTALL ducklake'); \
+"
+
+COPY lambdas/shared/ ${LAMBDA_TASK_ROOT}/shared/
