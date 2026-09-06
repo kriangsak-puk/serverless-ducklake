@@ -113,3 +113,7 @@ DuckDB**, URI `duckdb:///:memory:`. It comes up already attached to the curated 
 (`customers`, `products`, `orders`, `order_items`, `mart_order_summary` under the
 `ducklake_catalog` database in SQL Lab's schema browser) — see **Superset de-risking** in
 `docs/architecture.md` for how that auto-attach mechanism works and how it was verified.
+
+## License
+
+[MIT](LICENSE)
